@@ -1,0 +1,2 @@
+# chang
+Git Changelog generator
