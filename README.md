@@ -22,12 +22,6 @@ commit message lines appear in an expected format that simplifies pattern matchi
 changelog generation).
 
 
-## TODOs
-
- * add colorize function to allow for multiple colors
- * change bracketed repo prelude to solarized background: make it be a label
- * refactor, clean up code, and add comments
- * add python typing annotations
- * format docstrings properly as per PEP etc
- * specify output file to dump the changelog to
-
+## Todo:
+ * small cleanup/refactoring
+ * flesh out readme with examples/overview notes
