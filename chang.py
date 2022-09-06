@@ -11,6 +11,7 @@ import re
 import shutil         # rm dir tree
 import subprocess
 import sys
+import time
 from typing import List, Pattern
 
 WORKDIR="._repos/"
@@ -149,6 +150,10 @@ def dump_changelog(repos: List[Repo], outfile: str = None) -> None:
     """
     if outfile:
         with open(outfile, "wt") as f:
+            # timestamp only needed when writing to file
+            timestamp = time.strftime("%b %d %Y")
+            print(f"~~ Changelog generated {timestamp} ~~\n", file=f)
+
             for repo_ in repos:
                 commits = repo_.get_commits()
                 for i in commits:
