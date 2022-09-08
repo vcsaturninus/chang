@@ -8,7 +8,7 @@ The script is designed to be flexible as regards the collection of commits
 extracted:
  * an arbitrary number of `python3` regular expression patterns can specified
    as arguments to the `--match` option; only commits _matching_ ALL of the specified
-   patterns will be included
+   patterns will be included.
  * another such set of patterns can be specified as arguments to the `--exclude`
    option; only commits matching NONE of the specified patterns will be
    included.
@@ -62,7 +62,7 @@ https://github.com/vcsaturninus/bitr.git
  * remove past clones (start clean), run quietly, and extract all commits
    from the default branch:
 ```
-└─$ ./chang.py -i repos.txt -q
+└─$ ./chang.py -i repos.txt -q -c
 [nc] chore!: repace unfeasible --noauth option with --noverify
 [nc] docs: update README md - remove outdated info and add TLS examples
 [nc] chore: perform large cleanup and write up README
@@ -123,6 +123,3 @@ https://github.com/vcsaturninus/bitr.git
 [cinic] feat: make debug prints togglable via make call
 [cinic] feat!: implement support for multi-line lists and multi-word values
 ```
-
-## Todo:
- * small cleanup/refactoring

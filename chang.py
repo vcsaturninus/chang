@@ -27,10 +27,10 @@ class Repo:
     the name and url of the repo.
     """
     def __init__(self, name: str, url: str) -> None:
-        self.name    = name
-        self.url     = url
-        self.path    = None
-        self.commits = []
+        self.name = name
+        self.url  = url
+        self.path: str = None
+        self.commits: List[str] = []
 
     def __str__(self) -> str :
         return self.name
@@ -57,11 +57,11 @@ class Repo:
         specified repo such that it can be cloned or fetched from.
         """
         git_cmd = None
-        path += self.name
+        path = os.path.abspath(path + self.name)
 
         # if path already exists but it is not a dir, remove it;
-        # if it exists and it is a dir, fetch; else if it does not
-        # exist, create the path and clone.
+        # if it exists and it is a dir, fetch;
+        # else if it does not exist, create the path and clone.
         if os.path.exists(path) and not os.path.isdir(path):
             os.remove(path)
 
@@ -71,8 +71,6 @@ class Repo:
             os.makedirs(path)
             git_cmd = f"git clone {self.url} {path}"
 
-        path = os.path.abspath(path)
-
         try:
             subprocess.run(git_cmd,
                            text=True,
@@ -81,7 +79,6 @@ class Repo:
                            shell=True,
                            stdout=subprocess.PIPE,
                            stderr=subprocess.STDOUT)
-
         except subprocess.CalledProcessError as e:
             output = e.stdout.strip()
             print(f'Command "{git_cmd}" failed with error code {e.returncode}: \n"{output}"')
@@ -89,12 +86,11 @@ class Repo:
         else:
             self.path = path
 
-
     def scrape_commits(self,
                        start: str = None,
-                       end: str = None,
+                       end:   str = None,
                        match_list: List[Pattern] = None,
-                       excl_list: List[Pattern] = None
+                       excl_list:  List[Pattern] = None
                        ) -> None:
         """Extract matching commits from repository.
 
@@ -104,17 +100,19 @@ class Repo:
         If match_list is specified, the commits not matching the pattern are filtered out.
         If exclude is specified, the commits matching the exclude pattern are filtered out.
         """
+        # reset any previous results from previous invocations
+        self.commits = []
+
         cmd = "git log --oneline"
-        if start and not end or end and not start:
-            raise Exception("Start and end commits must both be either specified or unspecified")
+        check_tag_semantics(start, end)
 
         if start and end:
             cmd = f"{cmd} {start}..{end}"
 
-        log(VERBOSE, f' => extracting commit set from {self.name} with command "{cmd}"')
+        log(VERBOSE, f' ::=> extracting commit set from {self.name} with command "{cmd}"')
         ret = None
-
         os.chdir(self.path)
+
         try:
             ret = subprocess.run(cmd,
                                   timeout=100,               # 100 seconds timeout
@@ -134,25 +132,52 @@ class Repo:
             for line in output.split('\n'):
                 line = line.split()
                 line = ' '.join(line[1:])
-                # only non-empty lines and lines that pass all filters
+                # only save non-empty lines that pass all filters
                 if line != '' and matches(line, match_list, excl_list):
                     self.commits.append(line)
         finally:
             os.chdir(PWD)
 
 
-def dump_changelog(repos: List[Repo], outfile: str = None) -> None:
+class TagError(Exception):
+    """Error for incorrect tag semantics
+
+    Start and end tags/commits must be specified as a pair: they must
+    either both be passed or neither should be passed. Passing only one
+    is an error and this exception will be raised.
+    """
+    def __init__(self) -> None:
+        errmsg = "Invalid semantics: must pass either both or neither of start and end tags."
+        super().__init__(errmsg)
+
+
+def check_tag_semantics(start_tag: str=None, end_tag: str=None):
+    """Raise appropriate exception if only one of start_tag and end_tag is not None
+
+    See TagError.
+    """
+    if start_tag and not end_tag or end_tag and not start_tag:
+        raise TagError()
+
+
+def dump_changelog(repos: List[Repo], outfile: str = None, start_tag: str = None, end_tag: str = None) -> None:
     """Print commit set to stdout or outfile.
 
     Write the matching commit set either to stdout or otherwise
     if outfile is not None, to OUTFILE. The specified file is
     truncated and created if it does not exist.
     """
+    check_tag_semantics(start_tag, end_tag)
+
     if outfile:
         with open(outfile, "wt") as f:
             # timestamp only needed when writing to file
             timestamp = time.strftime("%b %d %Y")
-            print(f"~~ Changelog generated {timestamp} ~~\n", file=f)
+
+            if start_tag or end_tag:
+                print(f"~~ Changelog generated {timestamp} [{start_tag}, {end_tag}] ~~\n", file=f)
+            else:
+                print(f"~~ Changelog generated {timestamp} ~~\n", file=f)
 
             for repo_ in repos:
                 commits = repo_.get_commits()
@@ -164,6 +189,7 @@ def dump_changelog(repos: List[Repo], outfile: str = None) -> None:
             commits = repo_.get_commits()
             for i in commits:
                 print(f"[{colorize(repo_, 'green')}] {i}")
+
 
 def matches(s: str, match_list: List[Pattern] = None, excl_list: List[Pattern] = None) -> bool:
     """Match s against the specified list(s) of Regex patterns.
@@ -186,6 +212,7 @@ def matches(s: str, match_list: List[Pattern] = None, excl_list: List[Pattern] =
 
     # passsed all filters
     return True
+
 
 def colorize(s: str, color: str = None) -> str:
     """Decorate with ASCII colors (terminal color codes).
@@ -237,7 +264,32 @@ def rmdir(path: str, recreate: bool = True) -> None:
         os.mkdir(path)
 
 
-# --------------------------------------------------------------- #
+def read_repos_from_file(srcf: str, repoq: List[Repo], restrict: List[str] = None) -> None:
+    """Populate repoq with a list of Repo instances based on contents read from file srcf.
+
+    srcf must be a file listing git repository URLs, one per line. Each line is parsed and
+    a Repo instance is created based on that and appended to the queue repoq.
+    """
+    with open(srcf, "rt") as f:
+        for line in f.readlines():
+            repo_url = line.strip()
+            # skip empty lines
+            if repo_url == '':
+                continue
+
+            # break down into basic components of interest: name and url
+            repo_name = repo_url.split('/')[-1]        # name of the repo is the last component
+            repo_name = repo_name.replace(".git", "")  # strip off .git extension substring if present
+
+            # if list of repo names to filter for is specified skip non-matching repos
+            if restrict and repo_name not in restrict:
+                continue
+
+            repoq.append(Repo(repo_name, repo_url))
+
+
+
+# =============================================================== #
 #                      MAIN                                       #
 # --------------------------------------------------------------- #
 
@@ -301,9 +353,9 @@ parser.add_argument('-q',
 
 parser.add_argument('-r',
                      '--repo',
-                     nargs='*',                 # support any number of params
+                     nargs='*',                 # support any number of args
                      metavar="REPO",
-                     dest='repo',
+                     dest='restrict',
                      help='Only look at the specified repos, ignoring the other repos supplied via the input file'
                      )
 
@@ -311,41 +363,23 @@ parser.add_argument('-r',
 args = parser.parse_args()
 
 repo_objs: List[Repo] = []       # repository objects; repos to clone and extract changelog from
+read_repos_from_file(args.repos, repo_objs, args.restrict)
 
-
-# build up repo object list
-with open(args.repos, "rt") as f:
-    for line in f.readlines():
-        repo_url = line.strip()
-        # skip empty lines
-        if repo_url == '':
-            continue
-
-        # break down into basic components of interest: name and url
-        repo_name = repo_url.split('/')[-1]        # name of the repo is the last component
-        repo_name = repo_name.replace(".git", "")  # strip off .git extension substring if present
-
-        # if list of repo names to filter for is specified skip non-matching repos
-        if args.repo and repo_name not in args.repo:
-            continue
-
-        repo_objs.append(Repo(repo_name, repo_url))
+# REGEX lists; the cli allows specification of arbitrary number of filters
+pat  = [re.compile(m, re.IGNORECASE) for m in args.match ] if args.match else None
+excl = [re.compile(m, re.IGNORECASE) for m in args.exclude] if args.exclude else None
 
 # remove past clones IFF starting clean
 if args.clean:
     rmdir(WORKDIR)
 
-# check if silent mode enabled (verbse by default)
+# check if silent mode enabled (verbose by default)
 if args.quiet:
     VERBOSE=False
-
-# REGEX lists; the cli allows specification of arbitrary number of filters
-pat  = [re.compile(m, re.IGNORECASE) for m in args.match ] if args.match else None
-excl = [re.compile(m, re.IGNORECASE) for m in args.exclude] if args.exclude else None
 
 for repo in repo_objs:
     log(VERBOSE, f" => Getting latest {repo} from {repo.get_url()}")
     repo.clone_or_fetch(WORKDIR)
     repo.scrape_commits(start=args.start_tag, end=args.end_tag, match_list=pat, excl_list=excl)
 
-dump_changelog(repo_objs, args.outfile)
+dump_changelog(repo_objs, args.outfile, args.start_tag, args.end_tag)
