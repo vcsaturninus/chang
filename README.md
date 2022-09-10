@@ -75,12 +75,12 @@ https://github.com/vcsaturninus/bitr.git
    only extract commits matching matching the 'feat' or 'fix' `conventional
    commits` tags:
 ```
-└─$ ./chang.py -i repos.txt -q --match 'feat!?:'
+└─$ ./chang.py -i repos.txt -q --match 'feat!?:|fix!?:'
 [nc] feat: add unix domain socket support
 [mockit] feat: add new luamockit inqueue function
 [mockit] feat!: commit slight redesign of mockit API and update tests accordingly
 [cinic] feat!: implement support for multi-line lists and multi-word values
-[cinic] feat: allow changing the section namespace delimiter char dynamically
+[cinic] fix: allow changing the section namespace delimiter char dynamically
 [bitr] feat!: change new signature to take specification param for all 1s/all 0s initialization
 [bitr] feat: implement lua interface to C bitr
 ```
@@ -109,10 +109,10 @@ https://github.com/vcsaturninus/bitr.git
    matching the `feat` tag/substring and write the extracted commits to
    `changelog.txt`:
 ```
-./chang.py -i repos.txt --match 'feat' -o changelog.txt
+./chang.py -i repos.txt --match 'feat' -s 'rc.1' -e 'beta.3' -o changelog.txt
 
 └─$ cat changelog.txt
-~~ Changelog generated Tue Sep 6 2022 ~~
+~~ Changelog generated Tue Sep 6 2022 [rc.1, beta.3] ~~
 
 [nc] feat: add unix domain socket support
 [mockit] feat: add new luamockit inqueue function
