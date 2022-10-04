@@ -81,7 +81,7 @@ class Repo:
                            stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             output = e.stdout.strip()
-            print(f'Command "{git_cmd}" failed with error code {e.returncode}: \n"{output}"')
+            print(f' !! Command "{git_cmd}" failed with error code {e.returncode}: \n"{colorize(output, "red")}"')
             sys.exit(11)
         else:
             self.path = path
@@ -124,8 +124,7 @@ class Repo:
                                   )
         except subprocess.CalledProcessError as e:
             output = e.stdout.strip()
-            print(f'Command "{cmd}" failed with error code {e.returncode}: \n"{output}"')
-            sys.exit(11)
+            print(f' !! Command "{cmd}" failed with error code {e.returncode}: \n"{colorize(output, "red")}"')
         else:
             output = ret.stdout.strip()
             # remove starting commit hash (first field)
@@ -378,7 +377,7 @@ if args.quiet:
     VERBOSE=False
 
 for repo in repo_objs:
-    log(VERBOSE, f" => Getting latest {repo} from {repo.get_url()}")
+    log(VERBOSE, f"\n => Getting latest {repo} from {repo.get_url()}")
     repo.clone_or_fetch(WORKDIR)
     repo.scrape_commits(start=args.start_tag, end=args.end_tag, match_list=pat, excl_list=excl)
 
